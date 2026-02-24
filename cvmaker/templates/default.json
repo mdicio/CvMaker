@@ -1,0 +1,34 @@
+{
+    "fonts": {
+        "name": "Calibri",
+        "heading1_size": 24,
+        "heading2_size": 14,
+        "heading3_size": 12,
+        "body_size": 11
+    },
+    "colors": {
+        "heading": "#2c3e50",
+        "subheading": "#34495e",
+        "body": "#333333",
+        "accent": "#3498db"
+    },
+    "spacing": {
+        "section_before": 12,
+        "section_after": 6,
+        "line_spacing": 1.15
+    },
+    "header": {
+        "background": "#eaf3ff",
+        "border_color": "#3498db",
+        "border_width": 1,
+        "padding": 12,
+        "radius": 8,
+        "gap": 12
+    },
+    "margins": {
+        "top": 0.75,
+        "bottom": 0.75,
+        "left": 0.75,
+        "right": 0.75
+    }
+}

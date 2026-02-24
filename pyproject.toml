@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cvmaker"
+version = "1.0.0"
+description = "Convert markdown CVs to professionally formatted PDF and DOCX documents."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["cv", "resume", "markdown", "pdf", "docx", "generator"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+dependencies = [
+    "python-docx>=1.1.0",
+    "markdown>=3.5.0",
+    "weasyprint>=60.0",
+]
+
+[project.optional-dependencies]
+gui = []  # tkinter is included with Python
+
+[project.scripts]
+cvmaker = "cvmaker.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/cvmaker"
+Repository = "https://github.com/yourusername/cvmaker"
+Issues = "https://github.com/yourusername/cvmaker/issues"
+
+[tool.setuptools.packages.find]
+include = ["cvmaker*"]
+
+[tool.setuptools.package-data]
+cvmaker = ["templates/*.json"]
