@@ -1,17 +1,33 @@
-"""Markdown CV parser - converts markdown to structured CV data."""
+"""Markdown CV parser — converts markdown to structured CV data.
+
+Format conventions
+------------------
+- ``# Name``                → CV holder's name
+- First line after name     → subtitle (if no ``|``) or contact info (if ``|``)
+- Second line after name    → contact info
+- ``## Section``            → major section heading
+- ``### Title | Org | Date``→ subsection; last pipe-part is date if it looks datelike
+- ``- bullet text | Date``  → list item with optional trailing date
+- ``[text](url)``           → standard markdown link (rendered as hyperlink)
+- ``<!-- chips -->``         → display hint placed after ``##`` to render items as tags
+"""
 
 import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 
+# ── Data structures ─────────────────────────────────────────────────────────
+
+
 @dataclass
 class TextRun:
-    """A run of text with formatting."""
+    """A run of text with optional formatting and link."""
 
     text: str
     bold: bool = False
     italic: bool = False
+    url: Optional[str] = None
 
 
 @dataclass
@@ -20,7 +36,6 @@ class ListItem:
 
     runs: list[TextRun] = field(default_factory=list)
     date: Optional[str] = None
-    url: Optional[str] = None
 
 
 @dataclass
@@ -29,7 +44,6 @@ class Paragraph:
 
     runs: list[TextRun] = field(default_factory=list)
     date: Optional[str] = None
-    url: Optional[str] = None
 
 
 @dataclass
@@ -44,9 +58,15 @@ class SubSection:
 
 @dataclass
 class Section:
-    """A main section of the CV (H2)."""
+    """A main section of the CV (H2).
+
+    *display* controls rendering style:
+    - ``"default"`` – standard list / paragraph rendering
+    - ``"chips"``   – horizontal tag / badge rendering
+    """
 
     title: str
+    display: str = "default"
     content: list[Paragraph | ListItem | SubSection] = field(default_factory=list)
 
 
@@ -55,205 +75,176 @@ class CV:
     """Parsed CV structure."""
 
     name: str = ""
-    primary_title: str = ""
-    contact_line: Optional[Paragraph] = None
+    subtitle: str = ""
+    contact: Optional[Paragraph] = None
     sections: list[Section] = field(default_factory=list)
 
 
-def parse_inline_formatting(text: str) -> list[TextRun]:
-    """Parse inline markdown formatting (bold, italic) into TextRuns."""
-    runs = []
+# ── Date detection ──────────────────────────────────────────────────────────
 
-    # Pattern to match **bold**, *italic*, ***bold italic***
-    pattern = r"(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^*]+))"
-
-    for match in re.finditer(pattern, text):
-        if match.group(2):  # ***bold italic***
-            runs.append(TextRun(text=match.group(2), bold=True, italic=True))
-        elif match.group(3):  # **bold**
-            runs.append(TextRun(text=match.group(3), bold=True))
-        elif match.group(4):  # *italic*
-            runs.append(TextRun(text=match.group(4), italic=True))
-        elif match.group(5):  # plain text
-            if match.group(5):
-                runs.append(TextRun(text=match.group(5)))
-
-    # Filter out empty runs
-    runs = [r for r in runs if r.text]
-
-    return runs if runs else [TextRun(text=text)]
+_MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?"
+_YEAR = r"\d{4}"
+_MY = rf"(?:{_MONTH}\s+)?{_YEAR}"
+_MMYY = r"\d{1,2}/\d{4}"
+_END = rf"(?:present|current|{_MY}|{_MMYY})"
+_DATE_RE = re.compile(
+    rf"^\s*(?:{_MY}(?:\s*[-–—]\s*{_END})?|{_MMYY}(?:\s*[-–—]\s*{_END})?)\s*$",
+    re.IGNORECASE,
+)
 
 
-def _looks_like_date(text: str) -> bool:
-    """Heuristically detect if a string is a date or date range."""
-    return bool(
-        re.search(r"(\d{4}|\d{1,2}/\d{4}|present|Present|current|Current)", text)
-    )
+def _is_date(text: str) -> bool:
+    """Return True when *text* looks like a date or date range."""
+    return bool(_DATE_RE.match(text))
 
 
-def _split_title_and_date(text: str) -> tuple[str, Optional[str]]:
-    """Split a subsection heading into title and date when possible."""
-    parts = [p.strip() for p in text.split("|") if p.strip()]
+def _split_date(text: str) -> tuple[str, Optional[str]]:
+    """Split a trailing date off pipe-separated text.
 
-    if len(parts) >= 2 and _looks_like_date(parts[-1]):
-        title = " | ".join(parts[:-1])
-        return title, parts[-1]
-
-    # Fallback for trailing date in parentheses/brackets
-    paren_match = re.match(r"^(.*?)[\[(](.+?)[\])}]\s*$", text)
-    if paren_match and _looks_like_date(paren_match.group(2)):
-        return paren_match.group(1).strip(), paren_match.group(2).strip()
-
+    Only the *last* pipe-separated segment is considered; it is extracted as a
+    date only when it matches a recognised date pattern.  The remaining parts
+    are re-joined with ``|``.
+    """
+    parts = [p.strip() for p in text.split("|")]
+    if len(parts) >= 2 and _is_date(parts[-1]):
+        return " | ".join(parts[:-1]), parts[-1]
     return text, None
 
 
-def _looks_like_url(text: str) -> bool:
-    return bool(re.match(r"(https?://|www\.)", text)) or "." in text and "/" in text
+# ── Inline formatting ──────────────────────────────────────────────────────
+
+_INLINE_RE = re.compile(
+    r"\[([^\]]+)\]\(([^)]+)\)"  # [text](url)
+    r"|\*\*\*(.+?)\*\*\*"  # ***bold italic***
+    r"|\*\*(.+?)\*\*"  # **bold**
+    r"|\*(.+?)\*"  # *italic*
+    r"|([^[*]+)"  # plain text
+)
 
 
-def _extract_url(text: str) -> str:
-    """Extract the most URL-looking token from a text segment."""
-    # Strip markdown bold/italic markers
-    cleaned = text.replace("**", "").replace("*", "")
-    # Find URL-like tokens
-    candidates = re.findall(
-        r"(https?://\S+|www\.\S+|[\w.-]+\.[\w.-]+/\S+|[\w.-]+\.[\w.-]+)", cleaned
-    )
-    if candidates:
-        return candidates[-1].rstrip(".,;")
-    return cleaned.strip()
+def parse_inline(text: str) -> list[TextRun]:
+    """Parse inline markdown: ``**bold**``, ``*italic*``, ``[link](url)``."""
+    runs: list[TextRun] = []
+    for m in _INLINE_RE.finditer(text):
+        if m.group(1) is not None:  # link
+            runs.append(TextRun(text=m.group(1), url=m.group(2)))
+        elif m.group(3):  # bold-italic
+            runs.append(TextRun(text=m.group(3), bold=True, italic=True))
+        elif m.group(4):  # bold
+            runs.append(TextRun(text=m.group(4), bold=True))
+        elif m.group(5):  # italic
+            runs.append(TextRun(text=m.group(5), italic=True))
+        elif m.group(6):  # plain
+            runs.append(TextRun(text=m.group(6)))
+    return [r for r in runs if r.text] or [TextRun(text=text)]
 
 
-def _looks_like_contact(text: str) -> bool:
-    """Heuristically detect if a line is contact info."""
-    lowered = text.lower()
-    if "|" in text:
-        return True
-    return any(
-        key in lowered
-        for key in (
-            "email",
-            "@",
-            "linkedin",
-            "github",
-            "gitlab",
-            "phone",
-            "tel",
-            "location",
-        )
-    )
+# ── Header processing ──────────────────────────────────────────────────────
 
 
-def _split_body_meta(text: str) -> tuple[str, Optional[str], Optional[str]]:
-    """Split body text and trailing date/url after pipes.
+def _process_header(cv: CV, lines: list[str]) -> None:
+    """Populate *cv.subtitle* and *cv.contact* from lines between H1 and H2.
 
-    Priority: last pipe part that looks like URL becomes url; remaining last part that
-    looks like date becomes date. Body is the rest joined with pipes.
+    Rules (simple, position-based):
+    - If there is exactly one line and it contains ``|`` → contact info.
+    - If there is exactly one line without ``|`` → subtitle.
+    - If there are two or more lines → first is subtitle, second is contact.
     """
-    parts = [p.strip() for p in text.split("|") if p.strip()]
-
-    url = None
-    date = None
-
-    if parts and _looks_like_url(parts[-1]):
-        part = parts.pop()
-        url = _extract_url(part)
-        residual = part.replace(url, "").strip().strip("|,")
-        if residual:
-            parts.append(residual)
-
-    if parts and _looks_like_date(parts[-1]):
-        date = parts.pop()
-
-    body = " | ".join(parts) if parts else text
-    return body, date, url
+    if not lines:
+        return
+    if len(lines) == 1:
+        if "|" in lines[0]:
+            cv.contact = Paragraph(runs=parse_inline(lines[0]))
+        else:
+            cv.subtitle = lines[0]
+    else:
+        cv.subtitle = lines[0]
+        cv.contact = Paragraph(runs=parse_inline(lines[1]))
 
 
-def parse_markdown(markdown_text: str) -> CV:
-    """Parse markdown CV text into structured CV data."""
+# ── Main parser ─────────────────────────────────────────────────────────────
+
+
+def parse_markdown(text: str) -> CV:
+    """Parse markdown text into a structured :class:`CV`."""
     cv = CV()
-    lines = markdown_text.strip().split("\n")
+    lines = text.strip().split("\n")
 
     current_section: Optional[Section] = None
     current_subsection: Optional[SubSection] = None
+    header_lines: list[str] = []
+    header_done = False
 
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.strip()
-
-        # Skip empty lines
+    for raw_line in lines:
+        stripped = raw_line.strip()
         if not stripped:
-            i += 1
             continue
 
-        # H1 - Name
+        # HTML comment → display hint  (e.g. <!-- chips -->)
+        hint = re.match(r"^<!--\s*(\w+)\s*-->$", stripped)
+        if hint and current_section:
+            current_section.display = hint.group(1)
+            continue
+
+        # H1 — name
         if stripped.startswith("# ") and not stripped.startswith("## "):
             cv.name = stripped[2:].strip()
-            i += 1
             continue
 
-        # H2 - Section
+        # H2 — section
         if stripped.startswith("## ") and not stripped.startswith("### "):
-            # Save current section
+            if not header_done:
+                _process_header(cv, header_lines)
+                header_done = True
             if current_subsection and current_section:
                 current_section.content.append(current_subsection)
                 current_subsection = None
             if current_section:
                 cv.sections.append(current_section)
-
             current_section = Section(title=stripped[3:].strip())
-            i += 1
             continue
 
-        # H3 - Subsection
+        # H3 — subsection
         if stripped.startswith("### "):
             if current_subsection and current_section:
                 current_section.content.append(current_subsection)
-            title, date, url = _split_body_meta(stripped[4:].strip())
+            raw_title = stripped[4:].strip()
+            # Extract a leading markdown link from the title
+            url = None
+            link_m = re.match(r"\[([^\]]+)\]\(([^)]+)\)(.*)", raw_title)
+            if link_m:
+                raw_title = link_m.group(1) + link_m.group(3)
+                url = link_m.group(2)
+            title, date = _split_date(raw_title)
             current_subsection = SubSection(title=title, date=date, url=url)
-            i += 1
+            continue
+
+        # Lines before the first H2 belong to the header
+        if not header_done and cv.name:
+            header_lines.append(stripped)
             continue
 
         # List item
         if stripped.startswith("- ") or stripped.startswith("* "):
-            item_text = stripped[2:]
-            body_text, date, url = _split_body_meta(item_text)
-            runs = parse_inline_formatting(body_text)
-            list_item = ListItem(runs=runs, date=date, url=url)
-
+            body, date = _split_date(stripped[2:])
+            item = ListItem(runs=parse_inline(body), date=date)
             if current_subsection:
-                current_subsection.content.append(list_item)
+                current_subsection.content.append(item)
             elif current_section:
-                current_section.content.append(list_item)
-            i += 1
+                current_section.content.append(item)
             continue
 
-        # Regular paragraph
-        para_text, date, url = _split_body_meta(stripped)
-        runs = parse_inline_formatting(para_text)
-        para = Paragraph(runs=runs, date=date, url=url)
-
-        # If no section yet, the first non-contact line after the name is the primary title;
-        # contact info follows.
-        if not current_section and cv.name:
-            if not cv.primary_title and not _looks_like_contact(para_text):
-                cv.primary_title = para_text
-                i += 1
-                continue
-            if not cv.contact_line and _looks_like_contact(para_text):
-                cv.contact_line = para
-                i += 1
-                continue
-
+        # Paragraph
+        body, date = _split_date(stripped)
+        para = Paragraph(runs=parse_inline(body), date=date)
         if current_subsection:
             current_subsection.content.append(para)
         elif current_section:
             current_section.content.append(para)
 
-        i += 1
-
-    # Save final section/subsection
+    # Flush remaining structures
+    if not header_done:
+        _process_header(cv, header_lines)
     if current_subsection and current_section:
         current_section.content.append(current_subsection)
     if current_section:
@@ -263,7 +254,6 @@ def parse_markdown(markdown_text: str) -> CV:
 
 
 def parse_file(filepath: str) -> CV:
-    """Parse a markdown file into CV structure."""
+    """Parse a markdown file into a :class:`CV` structure."""
     with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-    return parse_markdown(content)
+        return parse_markdown(f.read())

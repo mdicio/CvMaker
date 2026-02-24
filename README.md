@@ -4,21 +4,43 @@ Write your CV in simple Markdown → get a professionally formatted **PDF** and 
 
 No design skills needed. No Word template wrestling. Just write, generate, done.
 
+**[🌐 Try the online editor →](https://mdicio.github.io/CvMaker/)**
+
 ---
 
 ## ✨ Features
 
 - **Markdown in, polished CV out** — write in plain text, get beautiful documents
 - **PDF + DOCX** — generate one or both formats in a single command
-- **Google Docs compatible** — DOCX files open and edit perfectly in Google Docs
-- **Multiple templates** — default, compact (one-page), and ultra-compact layouts
-- **Custom templates** — tweak fonts, colors, margins, and spacing via simple JSON
+- **Online editor** — browser-based UI hosted free on GitHub Pages, no install needed
+- **Standard markdown links** — `[LinkedIn](https://...)` renders as clickable hyperlinks
+- **Flexible sections** — any section name works; use `<!-- chips -->` for tag-style display
+- **Multiple templates** — default, compact, and ultra-compact layouts
+- **Custom templates** — tweak fonts, colours, margins, and spacing via simple JSON
 - **ATS-friendly** — clean structure that applicant tracking systems can parse
-- **GUI included** — graphical interface for those who prefer clicking over typing
+- **Desktop GUI included** — Tkinter interface for those who prefer clicking
 
-## 📦 Installation
+## 🌐 Online Editor
 
-### Quick Install (recommended)
+Use CVMaker directly in your browser — no installation required:
+
+**[https://mdicio.github.io/CvMaker/](https://mdicio.github.io/CvMaker/)**
+
+- Write / paste your markdown on the left
+- See a live preview on the right
+- Switch templates with the dropdown
+- Click **Print / Save PDF** to download
+
+### Host Your Own
+
+1. Fork this repository
+2. Go to **Settings → Pages**
+3. Set source to **Deploy from a branch**, branch `main`, folder `/docs`
+4. Your editor will be live at `https://<username>.github.io/CvMaker/`
+
+## 📦 Installation (CLI / Python)
+
+### Quick Install
 
 ```bash
 pip install .
@@ -26,13 +48,13 @@ pip install .
 
 This gives you a `cvmaker` command you can run from anywhere.
 
-### From Source (development)
+### From Source
 
 ```bash
-git clone https://github.com/yourusername/cvmaker.git
-cd cvmaker
+git clone https://github.com/mdicio/CvMaker.git
+cd CvMaker
 python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -e .
 ```
 
@@ -57,16 +79,18 @@ sudo dnf install pango gdk-pixbuf2
 
 ### 1. Write Your CV in Markdown
 
-Create a `.md` file (see [examples/sample_cv.md](examples/sample_cv.md) for a full example):
+Create a `.md` file (see [examples/sample_cv.md](examples/sample_cv.md)):
 
 ```markdown
 # Jane Smith
 
-**Email:** jane@email.com | **LinkedIn:** linkedin.com/in/janesmith
+Full-Stack Developer
+
+**Email:** jane@email.com | **Phone:** +1 555-0123 | [LinkedIn](https://linkedin.com/in/janesmith) | [GitHub](https://github.com/janesmith)
 
 ## Summary
 
-Software engineer with 5+ years of experience in full-stack development.
+Software engineer with 5+ years building scalable web applications.
 
 ## Experience
 
@@ -85,6 +109,11 @@ Software engineer with 5+ years of experience in full-stack development.
 
 - **Languages:** Python, Go, TypeScript
 - **Cloud:** AWS, Kubernetes, Terraform
+
+## Certifications
+<!-- chips -->
+- AWS Solutions Architect | 2023
+- CKA | 2022
 ```
 
 ### 2. Generate Your CV
@@ -96,9 +125,6 @@ cvmaker resume.md
 # PDF only
 cvmaker resume.md -f pdf
 
-# DOCX only
-cvmaker resume.md -f docx
-
 # Use compact template for a one-page CV
 cvmaker resume.md -t compact
 
@@ -106,52 +132,60 @@ cvmaker resume.md -t compact
 cvmaker resume.md -f pdf -o ~/Documents/my_resume.pdf
 ```
 
-Output files are saved next to the input file by default.
-
-### 3. Or Use the GUI
+### 3. Or Use the Desktop GUI
 
 ```bash
 cvmaker --gui
 ```
 
-Browse for your file, pick a format, click Generate.
+## 📝 Markdown Format
 
-## 📝 Markdown Format Guide
-
-| Syntax | What It Becomes |
+| Syntax | What it becomes |
 |--------|-----------------|
-| `# Name` | Your name (centered in header) |
-| `## Section` | Section title (Experience, Education, etc.) |
-| `### Title \| Company \| 2021 - Present` | Entry with right-aligned date |
-| `- Bullet point` | Bullet point |
-| `**bold**` | **Bold text** |
-| `*italic*` | *Italic text* |
+| `# Name` | Your name (centred in header) |
+| Line after `#` (no pipes) | Subtitle, shown beside name |
+| Line with `\|` separators | Contact info row |
+| `## Section` | Section heading |
+| `### Title \| Org \| 2021 - Present` | Entry with right-aligned date |
+| `- Bullet text` | Bullet point |
+| `- Item \| 2023` | Bullet with right-aligned date |
+| `**bold**` / `*italic*` | Formatting |
+| `[text](url)` | Clickable hyperlink |
+| `<!-- chips -->` | Place after `##` to render items as tags |
 
-**Dates**: Put the date as the last pipe-separated item on an `###` line — it gets right-aligned automatically:
+### Date convention
+
+The **last pipe-separated segment** on `###` headings and `- ` list items is treated as a date when it matches a recognised pattern (e.g. `2024`, `2020 - Present`, `Jan 2023`, `01/2024 - 12/2025`). Everything else stays as the title or body text.
+
+### Display hints
+
+Add an HTML comment right after a `## Section` heading to change how its content renders:
 
 ```markdown
-### Software Engineer | Google | 2020 - Present
+## Certifications
+<!-- chips -->
+- AWS Solutions Architect | 2023
+- CKA | 2022
 ```
+
+Currently supported hints: `chips` (horizontal tags). Default is standard list rendering.
 
 ## 🎨 Templates
 
-| Template | Description | Best For |
+| Template | Description | Best for |
 |----------|-------------|----------|
 | `default` | Standard layout (11pt, 0.75in margins) | Multi-page CVs |
 | `compact` | Tighter spacing (9pt, 0.5in margins) | One-page CVs |
 | `compact-narrow` | Minimal margins (8pt, 0.3in margins) | Dense one-page CVs |
 
 ```bash
-# List available templates
 cvmaker --list-templates
-
-# Use a template
 cvmaker resume.md -t compact
 ```
 
 ### Custom Templates
 
-Create a JSON file with your preferred styling:
+Create a JSON file:
 
 ```json
 {
@@ -182,8 +216,6 @@ Create a JSON file with your preferred styling:
 }
 ```
 
-Use it with:
-
 ```bash
 cvmaker resume.md -t /path/to/my_template.json
 ```
@@ -195,34 +227,34 @@ cvmaker/
 ├── cvmaker/                   # Python package
 │   ├── cli.py                 # Command-line interface
 │   ├── parser.py              # Markdown → structured data
-│   ├── pdf_generator.py       # Structured data → PDF
-│   ├── docx_generator.py      # Structured data → DOCX
-│   ├── gui.py                 # Tkinter GUI
+│   ├── pdf_generator.py       # Structured data → PDF (WeasyPrint)
+│   ├── docx_generator.py      # Structured data → DOCX (python-docx)
+│   ├── gui.py                 # Tkinter desktop GUI
 │   └── templates/             # Built-in style templates
-│       ├── default.json
-│       ├── compact.json
-│       └── compact-narrow.json
+├── docs/
+│   └── index.html             # Web editor (GitHub Pages)
 ├── examples/
-│   └── sample_cv.md           # Example CV to get started
-├── pyproject.toml             # Package configuration
-├── LICENSE                    # MIT License
+│   └── sample_cv.md           # Example CV
+├── pyproject.toml
+├── LICENSE
 └── README.md
 ```
 
 ## 💡 Tips
 
 - **One-page CV?** Use `-t compact` or `-t compact-narrow`
-- **Keep it concise**: 3–4 bullet points per role works best
-- **Any section name works**: Skills, Projects, Certifications, Languages — the parser handles them all
-- **The `|` separator is key**: `### Title | Company | Date` splits into a title with a right-aligned date
+- **Links in your CV** — use `[text](url)` for clickable LinkedIn, GitHub, etc.
+- **Chip-style certifications** — add `<!-- chips -->` after the section heading
+- **The `|` separator is key** — `### Title | Company | Date` splits into a title with a right-aligned date
+- **Any section name works** — Skills, Projects, Publications, Languages, etc.
 
 ## 🛠 Troubleshooting
 
 **PDF generation fails?**
-→ Install WeasyPrint system dependencies (see [Installation](#-installation))
+→ Install WeasyPrint system dependencies (see [Installation](#-installation-cli--python))
 
 **Fonts look wrong?**
-→ The default font is Calibri. If unavailable, it falls back to Arial / sans-serif. Install `fonts-crosextra-carlito` for a free Calibri-compatible font on Linux.
+→ The default font is Calibri. On Linux, install `fonts-crosextra-carlito` for a free Calibri-compatible font.
 
 **DOCX only (skip PDF)?**
 → Use `cvmaker resume.md -f docx` — no WeasyPrint needed.

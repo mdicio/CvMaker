@@ -1,411 +1,262 @@
-"""PDF generator - creates PDF documents from parsed CV data."""
+"""PDF generator — creates styled PDF from parsed CV data using WeasyPrint."""
 
 import json
-import re
 from pathlib import Path
 
-from weasyprint import HTML, CSS
+from weasyprint import HTML
 
 from .parser import CV, Section, SubSection, Paragraph, ListItem, TextRun
 
 
-def load_template(template_path: str | None = None) -> dict:
-    """Load styling template."""
-    if template_path is None:
-        template_path = Path(__file__).parent / "templates" / "default.json"
-
-    with open(template_path, "r") as f:
+def load_template(path: str | None = None) -> dict:
+    """Load a JSON styling template."""
+    if path is None:
+        path = Path(__file__).parent / "templates" / "default.json"
+    with open(path) as f:
         return json.load(f)
 
 
+# ── HTML helpers ────────────────────────────────────────────────────────────
+
+
+def _esc(text: str) -> str:
+    """Escape HTML special characters."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def runs_to_html(runs: list[TextRun]) -> str:
-    """Convert text runs to HTML with formatting."""
-    html_parts = []
-    for run in runs:
-        text = run.text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        if run.bold and run.italic:
-            html_parts.append(f"<strong><em>{text}</em></strong>")
-        elif run.bold:
-            html_parts.append(f"<strong>{text}</strong>")
-        elif run.italic:
-            html_parts.append(f"<em>{text}</em>")
-        else:
-            html_parts.append(text)
-    return "".join(html_parts)
+    """Convert a list of *TextRun* objects to an HTML fragment."""
+    parts: list[str] = []
+    for r in runs:
+        t = _esc(r.text)
+        if r.url:
+            t = f'<a href="{_esc(r.url)}">{t}</a>'
+        if r.bold and r.italic:
+            t = f"<strong><em>{t}</em></strong>"
+        elif r.bold:
+            t = f"<strong>{t}</strong>"
+        elif r.italic:
+            t = f"<em>{t}</em>"
+        parts.append(t)
+    return "".join(parts)
+
+
+# ── Full HTML document ──────────────────────────────────────────────────────
 
 
 def generate_html(cv: CV, template: dict) -> str:
-    """Generate HTML from parsed CV data."""
-    colors = template["colors"]
-    fonts = template["fonts"]
-    title_size = fonts.get(
-        "title_size", fonts.get("heading2_size", fonts["heading1_size"])
-    )
-    margins = template["margins"]
-    spacing = template["spacing"]
+    """Build a complete HTML document from parsed *cv* and *template*."""
+    c = template["colors"]
+    f = template["fonts"]
+    m = template["margins"]
+    s = template["spacing"]
+    h = template.get("header", {})
+    title_sz = f.get("title_size", f["heading2_size"])
 
     css = f"""
     @page {{
         size: letter;
-        margin: {margins['top']}in {margins['right']}in {margins['bottom']}in {margins['left']}in;
+        margin: {m['top']}in {m['right']}in {m['bottom']}in {m['left']}in;
     }}
     body {{
-        font-family: {fonts['name']}, Arial, sans-serif;
-        font-size: {fonts['body_size']}pt;
-        color: {colors['body']};
-        line-height: {spacing['line_spacing']};
-        margin: 0;
-        padding: 0;
+        font-family: {f['name']}, Arial, sans-serif;
+        font-size: {f['body_size']}pt;
+        color: {c['body']};
+        line-height: {s['line_spacing']};
+        margin: 0; padding: 0;
     }}
+    a {{ color: {c['accent']}; text-decoration: none; font-weight: 700; }}
     .header {{
-        border: {template.get('header', {}).get('border_width', 1)}px solid {template.get('header', {}).get('border_color', colors['accent'])};
-        background: {template.get('header', {}).get('background', 'rgba(52, 152, 219, 0.08)')};
-        padding: {template.get('header', {}).get('padding', spacing['section_after'])}px;
-        margin-bottom: {template.get('header', {}).get('gap', spacing['section_after'] * 2)}px;
+        border: {h.get('border_width', 1)}px solid {h.get('border_color', c['accent'])};
+        background: {h.get('background', 'rgba(52,152,219,0.08)')};
+        padding: {h.get('padding', s['section_after'])}px;
+        margin-bottom: {h.get('gap', s['section_after'] * 2)}px;
         text-align: center;
-        border-radius: {template.get('header', {}).get('radius', 8)}px;
-    }}
-    h1 {{
-        font-size: {fonts['heading1_size']}pt;
-        color: {colors['heading']};
-        margin: 0 0 {spacing['section_after'] // 3}px 0;
-        font-weight: bold;
+        border-radius: {h.get('radius', 8)}px;
     }}
     .name-line {{
-        display: flex;
-        justify-content: center;
-        align-items: baseline;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 0 0 {spacing['section_after'] // 3}px 0;
+        display: flex; justify-content: center; align-items: baseline;
+        flex-wrap: wrap; gap: 8px;
+        margin: 0 0 {s['section_after'] // 3}px 0;
     }}
     .name-text {{
-        font-size: {fonts['heading1_size']}pt;
-        color: {colors['heading']};
-        font-weight: 700;
+        font-size: {f['heading1_size']}pt; color: {c['heading']}; font-weight: 700;
     }}
     .name-title {{
-        font-size: {title_size}pt;
-        color: {colors['heading']};
-        font-weight: 600;
+        font-size: {title_sz}pt; color: {c['heading']}; font-weight: 600;
     }}
-    .name-separator {{
-        color: {colors['body']};
-        font-weight: 500;
+    .name-sep {{ color: {c['body']}; font-weight: 500; }}
+    h1 {{
+        font-size: {f['heading1_size']}pt; color: {c['heading']};
+        margin: 0 0 {s['section_after'] // 3}px 0; font-weight: bold;
     }}
     .contact {{
-        margin-top: 2px;
-        font-size: {fonts['body_size']}pt;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        justify-content: center;
-    }}
-    .contact-chunk {{
-        display: inline-flex;
-        white-space: nowrap;
-        gap: 3px;
-        align-items: baseline;
-    }}
-    .contact-url {{
-        font-size: {fonts['body_size']}pt;
-        color: {colors['accent']};
-        font-weight: 700;
-        text-decoration: none;
+        margin-top: 2px; font-size: {f['body_size']}pt;
     }}
     h2 {{
-        font-size: {fonts['heading2_size']}pt;
-        color: {colors['heading']};
-        margin: {spacing['section_before']}px 0 {spacing['section_after']}px 0;
-        font-weight: bold;
-        border-bottom: 2px solid {colors['accent']};
-        padding-bottom: 2px;
+        font-size: {f['heading2_size']}pt; color: {c['heading']};
+        margin: {s['section_before']}px 0 {s['section_after']}px 0;
+        font-weight: bold; border-bottom: 2px solid {c['accent']}; padding-bottom: 2px;
     }}
     .entry {{
-        margin: {spacing['section_after'] // 2}px 0 {spacing['section_after']}px 0;
+        margin: {s['section_after'] // 2}px 0 {s['section_after']}px 0;
     }}
-    .entry-header,
-    .para-line,
-    .item-line {{
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: baseline;
-        margin-bottom: {spacing['section_after'] // 3}px;
-    }}
-    .entry-url,
-    .para-url,
-    .item-url {{
-        font-size: {fonts['body_size']}pt;
-        color: {colors['accent']};
-        white-space: nowrap;
-        flex: 0 0 auto;
-        font-weight: 700;
-        text-decoration: none;
+    .entry-header, .line-flex {{
+        display: flex; justify-content: space-between; gap: 12px;
+        align-items: baseline; margin-bottom: {s['section_after'] // 3}px;
     }}
     .entry-title {{
-        font-size: {fonts['heading3_size']}pt;
-        color: {colors['subheading']};
-        font-weight: bold;
-        flex: 1 1 auto;
+        font-size: {f['heading3_size']}pt; color: {c['subheading']};
+        font-weight: bold; flex: 1 1 auto;
     }}
-    .entry-date,
-    .para-date,
-    .item-date {{
-        font-size: {fonts['body_size']}pt;
-        color: {colors['body']};
-        white-space: nowrap;
-        flex: 0 0 auto;
-        font-style: italic;
+    .date {{
+        font-size: {f['body_size']}pt; color: {c['body']};
+        white-space: nowrap; font-style: italic;
     }}
-    .cert-list {{
-        list-style: none;
-        padding-left: 0;
-        margin: {spacing['section_after'] // 2}px 0 {spacing['section_after']}px 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 10px;
+    .chips {{
+        list-style: none; padding: 0;
+        margin: {s['section_after'] // 2}px 0;
+        display: flex; flex-wrap: wrap; gap: 6px 10px;
     }}
-    .cert-chip {{
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        border: 1px solid {colors['accent']};
-        background: {colors['accent']}1a;
-        color: {colors['heading']};
-        font-weight: 600;
-        white-space: nowrap;
+    .chip {{
+        display: inline-block; padding: 4px 10px; border-radius: 12px;
+        border: 1px solid {c['accent']}; background: {c['accent']}1a;
+        color: {c['heading']}; font-weight: 600; white-space: nowrap;
     }}
-    .cert-chip-date {{
-        font-style: italic;
-        color: {colors['body']};
-        margin-left: 6px;
-    }}
-    .cert-chip-url {{
-        color: {colors['accent']};
-        font-weight: 700;
-        margin-left: 6px;
-        text-decoration: none;
-        white-space: nowrap;
-    }}
-    .para-text,
-    .item-text {{
-        flex: 1 1 auto;
-    }}
-    p {{
-        margin: {spacing['section_after'] // 3}px 0;
-    }}
-    ul {{
-        margin: {spacing['section_after'] // 2}px 0;
-        padding-left: 18px;
-    }}
-    li {{
-        margin: 0;
-        list-style-position: outside;
-    }}
+    .chip .date {{ margin-left: 6px; }}
+    .flex-text {{ flex: 1 1 auto; }}
+    p {{ margin: {s['section_after'] // 3}px 0; }}
+    ul {{ margin: {s['section_after'] // 2}px 0; padding-left: 18px; }}
+    li {{ margin: 0; list-style-position: outside; }}
     """
 
-    html_parts = [f"<html><head><style>{css}</style></head><body>"]
+    out: list[str] = [f"<html><head><style>{css}</style></head><body>"]
 
-    # Header block
-    if cv.name or cv.contact_line:
-        html_parts.append('<div class="header">')
-        if cv.name and cv.primary_title:
-            html_parts.append(
-                "<div class='name-line'>"
-                f"<span class='name-text'>{cv.name}</span>"
-                f"<span class='name-separator'>|</span>"
-                f"<span class='name-title'>{cv.primary_title}</span>"
+    # ── Header ──────────────────────────────────────────────────────────
+    if cv.name:
+        out.append('<div class="header">')
+        if cv.subtitle:
+            out.append(
+                '<div class="name-line">'
+                f'<span class="name-text">{_esc(cv.name)}</span>'
+                '<span class="name-sep">|</span>'
+                f'<span class="name-title">{_esc(cv.subtitle)}</span>'
                 "</div>"
             )
-        elif cv.name:
-            html_parts.append(f"<h1>{cv.name}</h1>")
-        if cv.contact_line:
-            contact_html = runs_to_html(cv.contact_line.runs)
-            chunks = [c.strip() for c in contact_html.split("|") if c.strip()]
-
-            url_pattern = re.compile(
-                r"(https?://\S+|www\.\S+|[\w.-]+\.[\w.-]+/\S+|[\w.-]+\.[\w.-]+)"
-            )
-
-            highlighted: list[str] = []
-            for c in chunks:
-                chunk_html = c
-                low = c.lower()
-                if "linkedin" in low or "github" in low:
-                    match = url_pattern.search(c)
-                    if match:
-                        url_text = match.group(0).rstrip(".,;")
-                        chunk_html = c.replace(
-                            url_text, f"<span class='contact-url'>{url_text}</span>", 1
-                        )
-                highlighted.append(f"<span class='contact-chunk'>{chunk_html}</span>")
-
-            if getattr(cv.contact_line, "url", None):
-                last_low = chunks[-1].lower() if chunks else ""
-                last_has_url = bool(chunks and url_pattern.search(chunks[-1]))
-                if highlighted:
-                    if (
-                        "linkedin" in last_low or "github" in last_low
-                    ) and not last_has_url:
-                        highlighted[-1] = highlighted[-1].replace(
-                            "</span>",
-                            f" <span class='contact-url'>{cv.contact_line.url}</span></span>",
-                            1,
-                        )
-                else:
-                    # Only apply accent if we know it's a github/linkedin URL
-                    if (
-                        "linkedin" in cv.contact_line.url.lower()
-                        or "github" in cv.contact_line.url.lower()
-                    ):
-                        highlighted = [
-                            f"<span class='contact-chunk contact-url'>{cv.contact_line.url}</span>"
-                        ]
-                    else:
-                        highlighted = [
-                            f"<span class='contact-chunk'>{cv.contact_line.url}</span>"
-                        ]
-
-            html_parts.append(f"<div class='contact'>{' '.join(highlighted)}</div>")
-        html_parts.append("</div>")
-
-    # Sections
-    for section in cv.sections:
-        html_parts.append(_section_to_html(section))
-
-    html_parts.append("</body></html>")
-    return "".join(html_parts)
-
-
-def _section_to_html(section: Section) -> str:
-    """Convert a section to HTML."""
-    title_lower = section.title.strip().lower()
-    html_parts = [f"<h2>{section.title}</h2>"]
-
-    # Render Certifications section as chip-style list
-    if "certification" in title_lower:
-        chips: list[str] = []
-        for item in section.content:
-            if isinstance(item, ListItem):
-                text_html = runs_to_html(item.runs)
-                extras = []
-                if item.date:
-                    extras.append(f'<span class="cert-chip-date">{item.date}</span>')
-                if item.url:
-                    extras.append(f'<span class="cert-chip-url">{item.url}</span>')
-                chip_body = text_html
-                if extras:
-                    chip_body = f"{chip_body} {' '.join(extras)}"
-                chips.append(f'<li class="cert-chip">{chip_body}</li>')
-            elif isinstance(item, Paragraph):
-                html_parts.append(_paragraph_to_html(item))
-            elif isinstance(item, SubSection):
-                html_parts.append(_subsection_to_html(item))
-        if chips:
-            html_parts.append(f'<ul class="cert-list">{"".join(chips)}</ul>')
-        return "".join(html_parts)
-
-    # Default rendering
-    for item in section.content:
-        if isinstance(item, SubSection):
-            html_parts.append(_subsection_to_html(item))
-        elif isinstance(item, Paragraph):
-            html_parts.append(_paragraph_to_html(item))
-        elif isinstance(item, ListItem):
-            html_parts.append(_listitem_to_html(item))
-
-    return "".join(html_parts)
-
-
-def _subsection_to_html(subsection: SubSection) -> str:
-    """Convert a subsection to HTML."""
-    html_parts = ['<div class="entry">']
-    html_parts.append('<div class="entry-header">')
-    html_parts.append(f'<div class="entry-title">{subsection.title}</div>')
-    if subsection.date:
-        html_parts.append(f'<div class="entry-date">{subsection.date}</div>')
-    if getattr(subsection, "url", None):
-        html_parts.append(f'<div class="entry-url">{subsection.url}</div>')
-    html_parts.append("</div>")
-
-    # Collect consecutive list items
-    current_list = []
-
-    for item in subsection.content:
-        if isinstance(item, ListItem):
-            if item.date or item.url:
-                right_parts = []
-                if item.date:
-                    right_parts.append(f'<span class="item-date">{item.date}</span>')
-                if item.url:
-                    right_parts.append(f'<span class="item-url">{item.url}</span>')
-                right_html = " ".join(right_parts)
-                current_list.append(
-                    f'<li class="item-line"><span class="item-text">{runs_to_html(item.runs)}</span>'
-                    f"{right_html}</li>"
-                )
-            else:
-                current_list.append(f"<li>{runs_to_html(item.runs)}</li>")
         else:
-            # Flush any pending list
-            if current_list:
-                html_parts.append(f'<ul>{"".join(current_list)}</ul>')
-                current_list = []
+            out.append(f"<h1>{_esc(cv.name)}</h1>")
+        if cv.contact:
+            out.append(f'<div class="contact">{runs_to_html(cv.contact.runs)}</div>')
+        out.append("</div>")
 
+    # ── Sections ────────────────────────────────────────────────────────
+    for sec in cv.sections:
+        out.append(f"<h2>{_esc(sec.title)}</h2>")
+        if sec.display == "chips":
+            _render_chips(sec, out)
+        else:
+            _render_default(sec, out)
+
+    out.append("</body></html>")
+    return "".join(out)
+
+
+# ── Section renderers ──────────────────────────────────────────────────────
+
+
+def _render_default(sec: Section, out: list[str]) -> None:
+    """Render a section with the standard layout."""
+    for item in sec.content:
+        if isinstance(item, SubSection):
+            _render_subsection(item, out)
+        elif isinstance(item, Paragraph):
+            _render_para(item, out)
+        elif isinstance(item, ListItem):
+            _render_item(item, out, wrap=True)
+
+
+def _render_chips(sec: Section, out: list[str]) -> None:
+    """Render list items as horizontal chip / badge elements."""
+    chips: list[str] = []
+    for item in sec.content:
+        if isinstance(item, ListItem):
+            body = runs_to_html(item.runs)
+            date_html = (
+                f' <span class="date">{_esc(item.date)}</span>' if item.date else ""
+            )
+            chips.append(f'<li class="chip">{body}{date_html}</li>')
+        else:
+            # Flush accumulated chips before non-list content
+            if chips:
+                out.append(f'<ul class="chips">{"".join(chips)}</ul>')
+                chips.clear()
+            if isinstance(item, SubSection):
+                _render_subsection(item, out)
+            elif isinstance(item, Paragraph):
+                _render_para(item, out)
+    if chips:
+        out.append(f'<ul class="chips">{"".join(chips)}</ul>')
+
+
+def _render_subsection(sub: SubSection, out: list[str]) -> None:
+    """Render an H3 subsection."""
+    out.append('<div class="entry"><div class="entry-header">')
+    title_html = (
+        f'<a href="{_esc(sub.url)}">{_esc(sub.title)}</a>'
+        if sub.url
+        else _esc(sub.title)
+    )
+    out.append(f'<div class="entry-title">{title_html}</div>')
+    if sub.date:
+        out.append(f'<div class="date">{_esc(sub.date)}</div>')
+    out.append("</div>")
+
+    li_buf: list[str] = []
+    for item in sub.content:
+        if isinstance(item, ListItem):
+            _render_item(item, li_buf, wrap=False)
+        else:
+            if li_buf:
+                out.append(f'<ul>{"".join(li_buf)}</ul>')
+                li_buf.clear()
             if isinstance(item, Paragraph):
-                html_parts.append(_paragraph_to_html(item))
-
-    # Flush remaining list items
-    if current_list:
-        html_parts.append(f'<ul>{"".join(current_list)}</ul>')
-
-    html_parts.append("</div>")
-    return "".join(html_parts)
+                _render_para(item, out)
+    if li_buf:
+        out.append(f'<ul>{"".join(li_buf)}</ul>')
+    out.append("</div>")
 
 
-def _paragraph_to_html(para: Paragraph) -> str:
-    """Convert a paragraph to HTML with optional right-aligned date."""
-    if para.date or para.url:
-        right_parts = []
-        if para.date:
-            right_parts.append(f'<span class="para-date">{para.date}</span>')
-        if para.url:
-            right_parts.append(f'<span class="para-url">{para.url}</span>')
-        right_html = " ".join(right_parts)
-        return (
-            '<p class="para-line">'
-            f'<span class="para-text">{runs_to_html(para.runs)}</span>'
-            f"{right_html}"
-            "</p>"
+def _render_para(para: Paragraph, out: list[str]) -> None:
+    """Render a paragraph with optional right-aligned date."""
+    if para.date:
+        out.append(
+            f'<p class="line-flex">'
+            f'<span class="flex-text">{runs_to_html(para.runs)}</span>'
+            f'<span class="date">{_esc(para.date)}</span></p>'
         )
-    return f"<p>{runs_to_html(para.runs)}</p>"
+    else:
+        out.append(f"<p>{runs_to_html(para.runs)}</p>")
 
 
-def _listitem_to_html(item: ListItem) -> str:
-    """Convert a list item to HTML with optional right-aligned date."""
-    if item.date or item.url:
-        right_parts = []
-        if item.date:
-            right_parts.append(f'<span class="item-date">{item.date}</span>')
-        if item.url:
-            right_parts.append(f'<span class="item-url">{item.url}</span>')
-        right_html = " ".join(right_parts)
-        return (
-            '<ul><li class="item-line">'
-            f'<span class="item-text">{runs_to_html(item.runs)}</span>'
-            f"{right_html}"
-            "</li></ul>"
+def _render_item(item: ListItem, out: list[str], *, wrap: bool) -> None:
+    """Render a single bullet-point item."""
+    if item.date:
+        inner = (
+            f'<li class="line-flex">'
+            f'<span class="flex-text">{runs_to_html(item.runs)}</span>'
+            f'<span class="date">{_esc(item.date)}</span></li>'
         )
-    return f"<ul><li>{runs_to_html(item.runs)}</li></ul>"
+    else:
+        inner = f"<li>{runs_to_html(item.runs)}</li>"
+    out.append(f"<ul>{inner}</ul>" if wrap else inner)
+
+
+# ── Public API ──────────────────────────────────────────────────────────────
 
 
 def generate_pdf(cv: CV, output_path: str, template_path: str | None = None) -> str:
-    """Generate a PDF file from parsed CV data."""
+    """Generate a PDF file and return the output path."""
     template = load_template(template_path)
-    html_content = generate_html(cv, template)
-
-    html = HTML(string=html_content)
-    html.write_pdf(output_path)
-
+    html_string = generate_html(cv, template)
+    HTML(string=html_string).write_pdf(output_path)
     return output_path

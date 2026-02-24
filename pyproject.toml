@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cvmaker"
-version = "1.0.0"
+version = "1.1.0"
 description = "Convert markdown CVs to professionally formatted PDF and DOCX documents."
 readme = "README.md"
 license = {text = "MIT"}
@@ -35,9 +35,9 @@ gui = []  # tkinter is included with Python
 cvmaker = "cvmaker.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/cvmaker"
-Repository = "https://github.com/yourusername/cvmaker"
-Issues = "https://github.com/yourusername/cvmaker/issues"
+Homepage = "https://mdicio.github.io/CvMaker/"
+Repository = "https://github.com/mdicio/CvMaker"
+Issues = "https://github.com/mdicio/CvMaker/issues"
 
 [tool.setuptools.packages.find]
 include = ["cvmaker*"]

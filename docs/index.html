@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVMaker — Markdown to Professional CV</title>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--border:#2a2d3a;
+  --text:#e1e4ed;--muted:#8b8fa3;
+  --accent:#3498db;--accent-bg:rgba(52,152,219,.08);
+  --preview-bg:#fff;
+}
+html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:10px 20px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.topbar h1{font-size:18px;font-weight:700;color:var(--accent);margin-right:auto}
+.topbar h1 span{color:var(--muted);font-weight:400}
+.topbar select,.topbar button{
+  padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);
+  transition:border-color .15s;
+}
+.topbar select:hover,.topbar button:hover{border-color:var(--accent)}
+.topbar button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.topbar button.primary:hover{background:#2980b9}
+
+/* ── Layout ───────────────────────────────────────────────────────────── */
+.app{display:flex;height:calc(100vh - 49px);overflow:hidden}
+.editor-pane{
+  flex:1;display:flex;flex-direction:column;
+  border-right:1px solid var(--border);min-width:0;
+}
+.editor-pane label{
+  padding:8px 16px;font-size:12px;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.5px;
+  border-bottom:1px solid var(--border);
+}
+.editor-pane textarea{
+  flex:1;resize:none;border:none;outline:none;padding:16px;
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  font-size:13px;line-height:1.6;tab-size:2;
+  background:var(--bg);color:var(--text);
+}
+.preview-pane{
+  flex:1;overflow-y:auto;background:var(--preview-bg);min-width:0;
+}
+.preview-pane label{
+  display:block;padding:8px 16px;font-size:12px;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.5px;
+  border-bottom:1px solid #e5e7eb;background:#f9fafb;
+}
+#preview{padding:24px 32px}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .app{flex-direction:column}
+  .editor-pane{border-right:none;border-bottom:1px solid var(--border);max-height:45vh}
+  .preview-pane{flex:1}
+}
+
+/* ── Print ─────────────────────────────────────────────────────────────── */
+@media print{
+  .topbar,.editor-pane,.preview-pane>label{display:none!important}
+  .app{display:block;height:auto}
+  .preview-pane{overflow:visible}
+  #preview{padding:0}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>CVMaker <span>— markdown to CV</span></h1>
+  <select id="template" title="Template">
+    <option value="default">Default</option>
+    <option value="compact">Compact</option>
+    <option value="compact-narrow">Compact Narrow</option>
+  </select>
+  <button onclick="loadSample()">📄 Load Sample</button>
+  <button class="primary" onclick="printCV()">🖨️ Print / Save PDF</button>
+</div>
+
+<div class="app">
+  <div class="editor-pane">
+    <label>Markdown</label>
+    <textarea id="input" spellcheck="false" placeholder="Paste or type your CV in markdown…"></textarea>
+  </div>
+  <div class="preview-pane">
+    <label>Preview</label>
+    <div id="preview"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Templates
+   ═══════════════════════════════════════════════════════════════════════ */
+const TEMPLATES = {
+  default: {
+    fonts:{name:"Calibri",heading1_size:24,heading2_size:14,heading3_size:12,body_size:11,title_size:14},
+    colors:{heading:"#2c3e50",subheading:"#34495e",body:"#333333",accent:"#3498db"},
+    spacing:{section_before:12,section_after:6,line_spacing:1.15},
+    header:{background:"#eaf3ff",border_color:"#3498db",border_width:1,padding:12,radius:8,gap:12},
+    margins:{top:.75,bottom:.75,left:.75,right:.75}
+  },
+  compact: {
+    fonts:{name:"Calibri",heading1_size:18,heading2_size:11,heading3_size:10,body_size:9,title_size:11},
+    colors:{heading:"#2c3e50",subheading:"#34495e",body:"#333333",accent:"#3498db"},
+    spacing:{section_before:6,section_after:3,line_spacing:1.0},
+    header:{background:"#eaf3ff",border_color:"#3498db",border_width:1,padding:8,radius:6,gap:8},
+    margins:{top:.5,bottom:.5,left:.5,right:.5}
+  },
+  "compact-narrow": {
+    fonts:{name:"Calibri",heading1_size:18,heading2_size:14,heading3_size:12,body_size:11,title_size:18},
+    colors:{heading:"#2c3e50",subheading:"#34495e",body:"#333333",accent:"#3498db"},
+    spacing:{section_before:6,section_after:6,line_spacing:1.25},
+    header:{background:"#eaf3ff",border_color:"#3498db",border_width:2,padding:6,radius:2,gap:6},
+    margins:{top:.18,bottom:.18,left:.3,right:.3}
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Markdown Parser (mirrors Python cvmaker.parser)
+   ═══════════════════════════════════════════════════════════════════════ */
+const DATE_RE = /^\s*(?:(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?\s+)?\d{4}(?:\s*[-–—]\s*(?:present|current|(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?\s+)?\d{4}|\d{1,2}\/\d{4}))?|\d{1,2}\/\d{4}(?:\s*[-–—]\s*(?:present|current|\d{1,2}\/\d{4}|\d{4}))?)\s*$/i;
+
+function isDate(t){return DATE_RE.test(t)}
+
+function splitDate(text){
+  const parts=text.split("|").map(p=>p.trim());
+  if(parts.length>=2 && isDate(parts[parts.length-1])){
+    const date=parts.pop();
+    return [parts.join(" | "),date];
+  }
+  return [text,null];
+}
+
+function parseInline(text){
+  const runs=[];
+  const re=/\[([^\]]+)\]\(([^)]+)\)|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^[*]+)/g;
+  let m;
+  while((m=re.exec(text))!==null){
+    if(m[1]!=null) runs.push({text:m[1],bold:false,italic:false,url:m[2]});
+    else if(m[3]) runs.push({text:m[3],bold:true,italic:true,url:null});
+    else if(m[4]) runs.push({text:m[4],bold:true,italic:false,url:null});
+    else if(m[5]) runs.push({text:m[5],bold:false,italic:true,url:null});
+    else if(m[6]) runs.push({text:m[6],bold:false,italic:false,url:null});
+  }
+  return runs.filter(r=>r.text)||[{text,bold:false,italic:false,url:null}];
+}
+
+function parseMarkdown(text){
+  const cv={name:"",subtitle:"",contact:null,sections:[]};
+  const lines=text.trim().split("\n");
+  let curSec=null,curSub=null,headerLines=[],headerDone=false;
+
+  for(const raw of lines){
+    const s=raw.trim();
+    if(!s) continue;
+
+    // display hint
+    const hm=s.match(/^<!--\s*(\w+)\s*-->$/);
+    if(hm && curSec){curSec.display=hm[1];continue}
+
+    // H1
+    if(s.startsWith("# ")&&!s.startsWith("## ")){cv.name=s.slice(2).trim();continue}
+
+    // H2
+    if(s.startsWith("## ")&&!s.startsWith("### ")){
+      if(!headerDone){processHeader(cv,headerLines);headerDone=true}
+      if(curSub&&curSec){curSec.content.push(curSub);curSub=null}
+      if(curSec) cv.sections.push(curSec);
+      curSec={title:s.slice(3).trim(),display:"default",content:[]};
+      continue;
+    }
+
+    // H3
+    if(s.startsWith("### ")){
+      if(curSub&&curSec) curSec.content.push(curSub);
+      let rawTitle=s.slice(4).trim();
+      let url=null;
+      const lm=rawTitle.match(/^\[([^\]]+)\]\(([^)]+)\)(.*)/);
+      if(lm){rawTitle=lm[1]+lm[3];url=lm[2]}
+      const [title,date]=splitDate(rawTitle);
+      curSub={type:"subsection",title,date,url,content:[]};
+      continue;
+    }
+
+    // Header lines
+    if(!headerDone&&cv.name){headerLines.push(s);continue}
+
+    // List
+    if(s.startsWith("- ")||s.startsWith("* ")){
+      const [body,date]=splitDate(s.slice(2));
+      const item={type:"list",runs:parseInline(body),date};
+      if(curSub) curSub.content.push(item);
+      else if(curSec) curSec.content.push(item);
+      continue;
+    }
+
+    // Paragraph
+    const [body,date]=splitDate(s);
+    const para={type:"paragraph",runs:parseInline(body),date};
+    if(curSub) curSub.content.push(para);
+    else if(curSec) curSec.content.push(para);
+  }
+
+  if(!headerDone) processHeader(cv,headerLines);
+  if(curSub&&curSec) curSec.content.push(curSub);
+  if(curSec) cv.sections.push(curSec);
+  return cv;
+}
+
+function processHeader(cv,lines){
+  if(!lines.length) return;
+  if(lines.length===1){
+    if(lines[0].includes("|")) cv.contact={runs:parseInline(lines[0])};
+    else cv.subtitle=lines[0];
+  } else {
+    cv.subtitle=lines[0];
+    cv.contact={runs:parseInline(lines[1])};
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HTML Renderer (mirrors Python cvmaker.pdf_generator)
+   ═══════════════════════════════════════════════════════════════════════ */
+function esc(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+
+function runsToHTML(runs){
+  return runs.map(r=>{
+    let t=esc(r.text);
+    if(r.url) t=`<a href="${esc(r.url)}" target="_blank">${t}</a>`;
+    if(r.bold&&r.italic) t=`<strong><em>${t}</em></strong>`;
+    else if(r.bold) t=`<strong>${t}</strong>`;
+    else if(r.italic) t=`<em>${t}</em>`;
+    return t;
+  }).join("");
+}
+
+function renderCV(cv,tpl){
+  const c=tpl.colors,f=tpl.fonts,s=tpl.spacing,h=tpl.header||{};
+  const tsz=f.title_size||f.heading2_size;
+
+  const css=`
+    .cv-root{font-family:${f.name},Arial,sans-serif;font-size:${f.body_size}pt;color:${c.body};line-height:${s.line_spacing}}
+    .cv-root a{color:${c.accent};text-decoration:none;font-weight:700}
+    .cv-root .header{border:${h.border_width||1}px solid ${h.border_color||c.accent};background:${h.background||'rgba(52,152,219,.08)'};padding:${h.padding||s.section_after}px;margin-bottom:${h.gap||s.section_after*2}px;text-align:center;border-radius:${h.radius||8}px}
+    .cv-root .name-line{display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;gap:8px;margin:0 0 ${Math.floor(s.section_after/3)}px 0}
+    .cv-root .name-text{font-size:${f.heading1_size}pt;color:${c.heading};font-weight:700}
+    .cv-root .name-title{font-size:${tsz}pt;color:${c.heading};font-weight:600}
+    .cv-root .name-sep{color:${c.body};font-weight:500}
+    .cv-root h1{font-size:${f.heading1_size}pt;color:${c.heading};margin:0 0 ${Math.floor(s.section_after/3)}px 0;font-weight:bold}
+    .cv-root .contact{margin-top:2px;font-size:${f.body_size}pt}
+    .cv-root h2{font-size:${f.heading2_size}pt;color:${c.heading};margin:${s.section_before}px 0 ${s.section_after}px 0;font-weight:bold;border-bottom:2px solid ${c.accent};padding-bottom:2px}
+    .cv-root .entry{margin:${Math.floor(s.section_after/2)}px 0 ${s.section_after}px 0}
+    .cv-root .entry-header,.cv-root .line-flex{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:${Math.floor(s.section_after/3)}px}
+    .cv-root .entry-title{font-size:${f.heading3_size}pt;color:${c.subheading};font-weight:bold;flex:1 1 auto}
+    .cv-root .date{font-size:${f.body_size}pt;color:${c.body};white-space:nowrap;font-style:italic}
+    .cv-root .chips{list-style:none;padding:0;margin:${Math.floor(s.section_after/2)}px 0;display:flex;flex-wrap:wrap;gap:6px 10px}
+    .cv-root .chip{display:inline-block;padding:4px 10px;border-radius:12px;border:1px solid ${c.accent};background:${c.accent}1a;color:${c.heading};font-weight:600;white-space:nowrap}
+    .cv-root .chip .date{margin-left:6px}
+    .cv-root .flex-text{flex:1 1 auto}
+    .cv-root p{margin:${Math.floor(s.section_after/3)}px 0}
+    .cv-root ul{margin:${Math.floor(s.section_after/2)}px 0;padding-left:18px}
+    .cv-root li{margin:0;list-style-position:outside}
+  `;
+
+  let o=`<style>${css}</style><div class="cv-root">`;
+
+  // Header
+  if(cv.name){
+    o+='<div class="header">';
+    if(cv.subtitle){
+      o+=`<div class="name-line"><span class="name-text">${esc(cv.name)}</span><span class="name-sep">|</span><span class="name-title">${esc(cv.subtitle)}</span></div>`;
+    } else {
+      o+=`<h1>${esc(cv.name)}</h1>`;
+    }
+    if(cv.contact) o+=`<div class="contact">${runsToHTML(cv.contact.runs)}</div>`;
+    o+='</div>';
+  }
+
+  // Sections
+  for(const sec of cv.sections){
+    o+=`<h2>${esc(sec.title)}</h2>`;
+    if(sec.display==="chips") o+=renderChips(sec);
+    else o+=renderDefault(sec);
+  }
+  o+='</div>';
+  return o;
+}
+
+function renderDefault(sec){
+  let o="";
+  for(const item of sec.content){
+    if(item.type==="subsection") o+=renderSubsection(item);
+    else if(item.type==="paragraph") o+=renderPara(item);
+    else if(item.type==="list") o+=renderItem(item,true);
+  }
+  return o;
+}
+
+function renderChips(sec){
+  let chips=[],o="";
+  for(const item of sec.content){
+    if(item.type==="list"){
+      const body=runsToHTML(item.runs);
+      const d=item.date?` <span class="date">${esc(item.date)}</span>`:"";
+      chips.push(`<li class="chip">${body}${d}</li>`);
+    } else {
+      if(chips.length){o+=`<ul class="chips">${chips.join("")}</ul>`;chips=[]}
+      if(item.type==="subsection") o+=renderSubsection(item);
+      else if(item.type==="paragraph") o+=renderPara(item);
+    }
+  }
+  if(chips.length) o+=`<ul class="chips">${chips.join("")}</ul>`;
+  return o;
+}
+
+function renderSubsection(sub){
+  let o='<div class="entry"><div class="entry-header">';
+  const titleHtml=sub.url?`<a href="${esc(sub.url)}" target="_blank">${esc(sub.title)}</a>`:esc(sub.title);
+  o+=`<div class="entry-title">${titleHtml}</div>`;
+  if(sub.date) o+=`<div class="date">${esc(sub.date)}</div>`;
+  o+="</div>";
+  let buf=[];
+  for(const item of sub.content){
+    if(item.type==="list") buf.push(renderItem(item,false));
+    else{
+      if(buf.length){o+=`<ul>${buf.join("")}</ul>`;buf=[]}
+      if(item.type==="paragraph") o+=renderPara(item);
+    }
+  }
+  if(buf.length) o+=`<ul>${buf.join("")}</ul>`;
+  o+="</div>";
+  return o;
+}
+
+function renderPara(p){
+  if(p.date) return `<p class="line-flex"><span class="flex-text">${runsToHTML(p.runs)}</span><span class="date">${esc(p.date)}</span></p>`;
+  return `<p>${runsToHTML(p.runs)}</p>`;
+}
+
+function renderItem(item,wrap){
+  let inner;
+  if(item.date) inner=`<li class="line-flex"><span class="flex-text">${runsToHTML(item.runs)}</span><span class="date">${esc(item.date)}</span></li>`;
+  else inner=`<li>${runsToHTML(item.runs)}</li>`;
+  return wrap?`<ul>${inner}</ul>`:inner;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   App logic
+   ═══════════════════════════════════════════════════════════════════════ */
+const SAMPLE = `# John Doe
+
+Software Engineer
+
+**Email:** john.doe@email.com | **Phone:** +1 (555) 123-4567 | [LinkedIn](https://linkedin.com/in/johndoe) | [GitHub](https://github.com/johndoe)
+
+## Summary
+
+Experienced software engineer with 5+ years of expertise in building scalable web applications and microservices. Passionate about clean code, test-driven development, and continuous learning.
+
+## Experience
+
+### Senior Software Engineer | TechCorp Inc. | 2021 - Present
+- Led development of microservices architecture serving 1M+ daily active users
+- Mentored team of 4 junior developers, conducting code reviews and pair programming
+- Reduced API response times by 40% through database optimization and caching strategies
+- Implemented CI/CD pipelines using GitHub Actions, reducing deployment time by 60%
+
+### Software Engineer | StartupXYZ | 2019 - 2021
+- Built RESTful APIs using Python/Django serving 100K+ requests per day
+- Developed real-time notification system using WebSockets and Redis
+
+### Junior Developer | WebAgency Co. | 2018 - 2019
+- Developed responsive web applications using React and TypeScript
+- Maintained and improved legacy PHP applications
+
+## Education
+
+### B.S. Computer Science | State University | 2018
+- GPA: 3.8/4.0 — Dean's List
+
+## Skills
+
+- **Languages:** Python, JavaScript, TypeScript, Go, SQL
+- **Frameworks:** Django, FastAPI, React, Node.js, Express
+- **Cloud/DevOps:** AWS, Docker, Kubernetes, Terraform, GitHub Actions
+
+## Projects
+
+### [Open Source Contribution](https://github.com/johndoe/project) | Python Package
+- Contributed to popular Python library with 5K+ GitHub stars
+- Implemented new feature for handling async operations
+
+### Personal Blog Platform | Side Project
+- Built full-stack blog platform using Next.js and PostgreSQL
+
+## Certifications
+<!-- chips -->
+- AWS Certified Solutions Architect - Associate | 2023
+- Kubernetes Administrator (CKA) | 2022
+`;
+
+const input=document.getElementById("input");
+const preview=document.getElementById("preview");
+const templateSelect=document.getElementById("template");
+
+let debounceTimer;
+function update(){
+  clearTimeout(debounceTimer);
+  debounceTimer=setTimeout(()=>{
+    const tpl=TEMPLATES[templateSelect.value]||TEMPLATES.default;
+    const cv=parseMarkdown(input.value);
+    preview.innerHTML=renderCV(cv,tpl);
+  },150);
+}
+
+input.addEventListener("input",update);
+templateSelect.addEventListener("change",update);
+
+function loadSample(){input.value=SAMPLE;update()}
+function printCV(){window.print()}
+
+// Init
+loadSample();
+</script>
+</body>
+</html>

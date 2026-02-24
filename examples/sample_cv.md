@@ -1,6 +1,8 @@
 # John Doe
 
-**Email:** john.doe@email.com | **Phone:** +1 (555) 123-4567 | **LinkedIn:** linkedin.com/in/johndoe | **GitHub:** github.com/johndoe
+Software Engineer
+
+**Email:** john.doe@email.com | **Phone:** +1 (555) 123-4567 | [LinkedIn](https://linkedin.com/in/johndoe) | [GitHub](https://github.com/johndoe)
 
 ## Summary
 
@@ -42,7 +44,7 @@ Experienced software engineer with 5+ years of expertise in building scalable we
 
 ## Projects
 
-### Open Source Contribution | Python Package
+### [Open Source Contribution](https://github.com/johndoe/project) | Python Package
 - Contributed to popular Python library with 5K+ GitHub stars
 - Implemented new feature for handling async operations
 - Fixed critical bug affecting 1000+ users
@@ -53,6 +55,6 @@ Experienced software engineer with 5+ years of expertise in building scalable we
 - Deployed on Vercel with automated CI/CD
 
 ## Certifications
-
-- AWS Certified Solutions Architect - Associate (2023)
-- Kubernetes Administrator (CKA) (2022)
+<!-- chips -->
+- AWS Certified Solutions Architect - Associate | 2023
+- Kubernetes Administrator (CKA) | 2022
