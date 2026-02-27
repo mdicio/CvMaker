@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV Maker — Web Builder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════ TOOLBAR ═══════════════════════════════ -->
+<nav class="toolbar">
+  <div class="toolbar-brand">
+    <span class="toolbar-logo">◈</span>
+    <span class="toolbar-title">CV Maker</span>
+    <span class="toolbar-badge">Builder</span>
+  </div>
+
+  <div class="toolbar-sep"></div>
+
+  <div class="toolbar-group">
+    <label class="toolbar-label" for="templateSelect">Template</label>
+    <select id="templateSelect" class="toolbar-select"></select>
+  </div>
+
+  <div class="toolbar-spacer"></div>
+
+  <span id="autosaveStatus" class="autosave-status"></span>
+
+  <div class="toolbar-actions">
+    <button id="newCvBtn" class="btn btn-ghost-toolbar" title="Start a new CV (clear current work)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      New
+    </button>
+
+    <div class="toolbar-sep"></div>
+
+    <button id="importBtn" class="btn btn-ghost-toolbar" title="Import existing .md CV file">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import .md
+    </button>
+
+    <div class="toolbar-sep"></div>
+
+    <span class="toolbar-label">Export</span>
+    <button id="exportPdfBtn" class="btn btn-export" title="Download as PDF">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      PDF
+    </button>
+    <button id="exportDocxBtn" class="btn btn-export" title="Download as DOCX">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      DOCX
+    </button>
+    <button id="exportMdBtn" class="btn btn-ghost-toolbar" title="Download as Markdown">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      .md
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ MAIN WORKSPACE ════════════════════════════ -->
+<div class="workspace">
+
+  <!-- ─────────────────────── EDITOR PANEL ─────────────────────── -->
+  <div class="panel editor-panel" id="editorPanel">
+    <div class="panel-inner">
+
+      <!-- Personal Info -->
+      <div class="card" id="personalCard">
+        <div class="card-header">
+          <span class="card-header-icon">👤</span>
+          <span class="card-header-title">Personal Info</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group span-full">
+              <label class="field-label">Full Name</label>
+              <input id="cvName" type="text" class="input" placeholder="e.g. Jane Smith" autocomplete="off" />
+            </div>
+            <div class="form-group span-full">
+              <label class="field-label">Title / Role</label>
+              <input id="cvSubtitle" type="text" class="input" placeholder="e.g. Senior Product Designer" autocomplete="off" />
+            </div>
+            <div class="form-group span-full">
+              <label class="field-label">
+                Contact &amp; Links
+                <span class="field-hint">Separate with  |  &nbsp;•&nbsp; supports [text](url) links</span>
+              </label>
+              <input id="cvContact" type="text" class="input"
+                placeholder="email@example.com | +1 555 000 0000 | [LinkedIn](https://…)"
+                autocomplete="off" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sections header -->
+      <div class="sections-header">
+        <span class="sections-label">Sections</span>
+        <button id="addSectionBtn" class="btn btn-accent btn-sm">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Section
+        </button>
+      </div>
+
+      <!-- Dynamic sections -->
+      <div id="sectionsList" class="sections-list"></div>
+
+    </div><!-- /panel-inner -->
+  </div><!-- /editor-panel -->
+
+  <!-- Resize handle -->
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <!-- ─────────────────────── PREVIEW PANEL ─────────────────────── -->
+  <div class="panel preview-panel" id="previewPanel">
+    <div class="preview-toolbar">
+      <span class="preview-label">Live Preview</span>
+      <span id="previewStatus" class="preview-status"></span>
+      <div style="flex:1"></div>
+      <button id="printBtn" class="btn btn-sm btn-ghost-light" title="Print CV (Ctrl+P)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print
+      </button>
+      <button id="refreshPreviewBtn" class="btn btn-sm btn-ghost-light" title="Force refresh">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div class="preview-viewport">
+      <iframe id="previewFrame" class="preview-frame" title="CV Preview"></iframe>
+    </div>
+  </div>
+
+</div><!-- /workspace -->
+
+<!-- ════════════════════ SECTION TYPE PICKER MODAL ════════════════════════ -->
+<div id="sectionPickerModal" class="modal" hidden aria-modal="true" role="dialog">
+  <div class="modal-backdrop" id="sectionPickerBackdrop"></div>
+  <div class="modal-dialog modal-wide">
+    <div class="modal-header">
+      <h2 class="modal-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add a Section
+      </h2>
+      <button class="modal-close" id="closeSectionPickerBtn" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-description">Choose a section type to get a pre-configured template, or add a blank custom section.</p>
+      <div class="stp-grid" id="sectionTypeGrid">
+        <!-- populated by app.js buildSectionTypePicker() -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ IMPORT MODAL ═════════════════════════════════ -->
+<div id="importModal" class="modal" hidden aria-modal="true" role="dialog">
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2 class="modal-title">Import Markdown CV</h2>
+      <button class="modal-close" id="closeModalBtn" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-description">
+        Upload an existing <code>.md</code> CV file to load it into the visual editor.
+        Your current work will be replaced.
+      </p>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".md,.markdown,.txt" class="file-input" />
+        <div class="drop-zone-inner">
+          <div class="drop-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <p class="drop-primary">Drop your <strong>.md</strong> file here</p>
+          <p class="drop-secondary">or click to browse</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ TOAST ════════════════════════════════════ -->
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

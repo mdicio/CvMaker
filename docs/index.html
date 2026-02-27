@@ -17,20 +17,36 @@ html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:
 
 /* ── Top bar ──────────────────────────────────────────────────────────── */
 .topbar{
-  display:flex;align-items:center;gap:12px;padding:10px 20px;
+  display:flex;align-items:center;gap:8px;padding:8px 16px;
   background:var(--surface);border-bottom:1px solid var(--border);
-  flex-shrink:0;
+  flex-shrink:0;user-select:none;
 }
-.topbar h1{font-size:18px;font-weight:700;color:var(--accent);margin-right:auto}
-.topbar h1 span{color:var(--muted);font-weight:400}
-.topbar select,.topbar button{
-  padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;
+.topbar-brand{font-size:16px;font-weight:700;color:var(--accent);margin-right:4px;white-space:nowrap}
+.topbar-brand span{color:var(--muted);font-weight:400;font-size:13px}
+.topbar-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 2px}
+.topbar-spacer{flex:1}
+.topbar-status{font-size:11px;color:#4ade80;opacity:0;transition:opacity .3s;white-space:nowrap}
+.topbar-status.show{opacity:1}
+.topbar select{
+  padding:5px 26px 5px 10px;border-radius:6px;font-size:13px;cursor:pointer;
   border:1px solid var(--border);background:var(--surface);color:var(--text);
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b8fa3' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;background-size:8px;
   transition:border-color .15s;
 }
-.topbar select:hover,.topbar button:hover{border-color:var(--accent)}
+.topbar select:focus{outline:none;border-color:var(--accent)}
+.topbar button{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 12px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);
+  transition:border-color .15s,background .15s;white-space:nowrap;
+}
+.topbar button:hover{border-color:var(--accent);background:rgba(52,152,219,.10)}
 .topbar button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
-.topbar button.primary:hover{background:#2980b9}
+.topbar button.primary:hover{background:#2980b9;border-color:#2980b9}
+.topbar button.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.topbar button.ghost:hover{border-color:var(--border);color:var(--text);background:rgba(255,255,255,0.05)}
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
 .app{display:flex;height:calc(100vh - 49px);overflow:hidden}
@@ -78,20 +94,40 @@ html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:
 <body>
 
 <div class="topbar">
-  <h1>CVMaker <span>— markdown to CV</span></h1>
+  <span class="topbar-brand">CVMaker <span>— markdown → CV</span></span>
+  <div class="topbar-sep"></div>
   <select id="template" title="Template">
     <option value="default">Default</option>
     <option value="compact">Compact</option>
     <option value="compact-narrow">Compact Narrow</option>
   </select>
-  <button onclick="loadSample()">📄 Load Sample</button>
-  <button class="primary" onclick="printCV()">🖨️ Print / Save PDF</button>
+  <div class="topbar-sep"></div>
+  <button onclick="loadSample()" title="Load example CV to get started">📄 Sample</button>
+  <button class="ghost" onclick="clearEditor()" title="Clear editor">✕ Clear</button>
+  <div class="topbar-spacer"></div>
+  <span class="topbar-status" id="saveStatus">✓ Saved</span>
+  <button class="primary" onclick="printCV()" title="Print or save as PDF (Ctrl+P)">🖨️ Print / Save PDF</button>
 </div>
 
 <div class="app">
   <div class="editor-pane">
     <label>Markdown</label>
-    <textarea id="input" spellcheck="false" placeholder="Paste or type your CV in markdown…"></textarea>
+    <textarea id="input" spellcheck="false" placeholder="# Your Name
+Your Title
+your@email.com | +1 555 000 0000 | [LinkedIn](https://linkedin.com)
+
+## Work Experience
+### Job Title | Company | 2020 – Present
+- Key achievement or responsibility
+- Another bullet point
+
+## Education
+### Degree | University | 2019
+
+## Skills
+- Languages: Python, JavaScript…
+
+Tip: use Ctrl+P to print/save as PDF&#10;Tip: click Sample to load a full example"></textarea>
   </div>
   <div class="preview-pane">
     <label>Preview</label>
@@ -415,6 +451,23 @@ const input=document.getElementById("input");
 const preview=document.getElementById("preview");
 const templateSelect=document.getElementById("template");
 
+const STORAGE_KEY='cvmaker_docs_v1';
+
+function saveToStorage(){
+  try{
+    localStorage.setItem(STORAGE_KEY,input.value);
+    const s=document.getElementById('saveStatus');
+    if(s){s.classList.add('show');clearTimeout(s._t);s._t=setTimeout(()=>s.classList.remove('show'),2000);}
+  }catch(e){}
+}
+
+function clearEditor(){
+  if(input.value&&!confirm('Clear the editor? Your work will be lost.'))return;
+  input.value='';
+  localStorage.removeItem(STORAGE_KEY);
+  update();
+}
+
 let debounceTimer;
 function update(){
   clearTimeout(debounceTimer);
@@ -422,6 +475,7 @@ function update(){
     const tpl=TEMPLATES[templateSelect.value]||TEMPLATES.default;
     const cv=parseMarkdown(input.value);
     preview.innerHTML=renderCV(cv,tpl);
+    saveToStorage();
   },150);
 }
 
@@ -431,8 +485,16 @@ templateSelect.addEventListener("change",update);
 function loadSample(){input.value=SAMPLE;update()}
 function printCV(){window.print()}
 
-// Init
-loadSample();
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='p'){e.preventDefault();printCV();}
+});
+
+// Init — restore saved session or start blank
+(function(){
+  const saved=localStorage.getItem(STORAGE_KEY);
+  if(saved&&saved.trim()){input.value=saved;update();}
+  else{update();} // start with empty/placeholder
+})();
 </script>
 </body>
 </html>

@@ -32,6 +32,8 @@ def main(args: list[str] | None = None) -> int:
         "  cvmaker resume.md -t compact         Use compact template (one-page)\n"
         "  cvmaker resume.md -f pdf             Generate PDF only\n"
         "  cvmaker --list-templates             Show available templates\n"
+        "  cvmaker --web                        Launch web-based builder\n"
+        "  cvmaker --web --port 8080            Web builder on custom port\n"
         "  cvmaker --gui                        Launch graphical interface",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -62,6 +64,20 @@ def main(args: list[str] | None = None) -> int:
 
     parser.add_argument("--gui", action="store_true", help="Launch graphical interface")
 
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Launch web-based CV builder in the browser",
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5173,
+        metavar="PORT",
+        help="Port for the web builder (default: 5173)",
+    )
+
     parsed_args = parser.parse_args(args)
 
     # List templates if requested
@@ -79,6 +95,13 @@ def main(args: list[str] | None = None) -> int:
                 print(f"  {t:20} {desc}")
         else:
             print("No templates found.")
+        return 0
+
+    # Launch web builder if requested
+    if parsed_args.web:
+        from .web_server import run_web
+
+        run_web(port=parsed_args.port)
         return 0
 
     # Launch GUI if requested
