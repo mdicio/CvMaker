@@ -30,7 +30,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gui = []  # tkinter is included with Python
+gui    = []  # tkinter is included with Python
+deploy = ["gunicorn>=21.0.0"]
 
 [project.scripts]
 cvmaker = "cvmaker.cli:main"

@@ -78,6 +78,13 @@ def main(args: list[str] | None = None) -> int:
         help="Port for the web builder (default: 5173)",
     )
 
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        metavar="HOST",
+        help="Host address for the web builder (default: 127.0.0.1; use 0.0.0.0 to listen on all interfaces)",
+    )
+
     parsed_args = parser.parse_args(args)
 
     # List templates if requested
@@ -101,7 +108,7 @@ def main(args: list[str] | None = None) -> int:
     if parsed_args.web:
         from .web_server import run_web
 
-        run_web(port=parsed_args.port)
+        run_web(host=parsed_args.host, port=parsed_args.port)
         return 0
 
     # Launch GUI if requested

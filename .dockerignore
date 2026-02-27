@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+dist/
+build/
+.venv
+venv
+env
+personal/
+docs/
+*.md
+*.pdf
+*.docx
