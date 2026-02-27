@@ -15,13 +15,13 @@
         "accent": "#3498db"
     },
     "spacing": {
-        "section_before": 6,
-        "section_after": 6,
-        "line_spacing": 1.25
+        "section_before": 8,
+        "section_after": 8,
+        "line_spacing": 1.4
     },
     "margins": {
-        "top": 0.18,
-        "bottom": 0.18,
+        "top": 0.3,
+        "bottom": 0.3,
         "left": 0.3,
         "right": 0.3
     },
@@ -29,8 +29,8 @@
         "background": "#eaf3ff",
         "border_color": "#3498db",
         "border_width": 2,
-        "padding": 6,
-        "radius": 2,
-        "gap": 6
+        "padding": 8,
+        "radius": 3,
+        "gap": 8
     }
 }
